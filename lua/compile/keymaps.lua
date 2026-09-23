@@ -1,61 +1,33 @@
 local compile = {}
 compile.keymaps = {}
 
---- Setup keybindings for plugin
-function compile.keymaps.setup(opts)
-	local term_group = vim.api.nvim_create_augroup("Compile", { clear = true })
+local opts = {}
 
-	-- Global keymaps
-	for modes, keymap in pairs(opts.keys.global) do
+--- Map every key of a { modes = { key = cmd } } table
+local function map_all(keys, map_opts)
+	for modes, keymap in pairs(keys) do
 		for key, cmd in pairs(keymap) do
 			vim.keymap.set(require("compile.utils").split_to_char(modes), key, function()
 				compile.keymaps.load(cmd)
-			end, { silent = true })
+			end, map_opts)
 		end
 	end
+end
 
-	-- Terminal-specific keymaps
-	vim.api.nvim_create_autocmd("BufCreate", {
-		group = term_group,
-		callback = function(ev)
-			local term_buf = require("compile.term").state.buf
-			if ev.buf ~= term_buf then
-				return
-			end
+--- Setup keybindings for plugin
+function compile.keymaps.setup(o)
+	opts = o
+	-- The terminal-global keys are mapped once here instead of being tied to the terminal buffer's
+	-- lifetime: unlisting (`hidden`) or renaming that buffer fires BufDelete, which used to remove
+	-- them right after they were created. The actions themselves are no-ops without a terminal.
+	map_all(opts.keys.global, { silent = true })
+	map_all(opts.keys.term.global, { silent = true })
+end
 
-			-- Global terminal keymaps
-			for modes, keymap in pairs(opts.keys.term.global) do
-				for key, cmd in pairs(keymap) do
-					vim.keymap.set(require("compile.utils").split_to_char(modes), key, function()
-						compile.keymaps.load(cmd)
-					end, { silent = true })
-				end
-			end
-
-			-- Buffer-local keymaps
-			for modes, keymap in pairs(opts.keys.term.buffer) do
-				for key, cmd in pairs(keymap) do
-					vim.keymap.set(require("compile.utils").split_to_char(modes), key, function()
-						compile.keymaps.load(cmd)
-					end, { buffer = ev.buf, silent = true })
-				end
-			end
-		end,
-	})
-
-	-- Cleanup keymaps on buffer delete
-	vim.api.nvim_create_autocmd("BufDelete", {
-		group = term_group,
-		callback = function(ev)
-			if ev.buf == require("compile.term").state.buf then
-				for modes, keymap in pairs(opts.keys.term.global) do
-					for key in pairs(keymap) do
-						pcall(vim.keymap.del, modes, key, { buffer = false })
-					end
-				end
-			end
-		end,
-	})
+--- Set the buffer-local keymaps of a freshly created terminal buffer
+---@param buf integer
+function compile.keymaps.attach(buf)
+	map_all(opts.keys.term.buffer, { buffer = buf, silent = true })
 end
 
 --- Load keymaps

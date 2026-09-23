@@ -25,11 +25,12 @@ function compile.term.init()
 	compile.term.state.buf = vim.api.nvim_create_buf(false, true)
 	compile.term.state.win = vim.api.nvim_open_win(compile.term.state.buf, true, opts.term_win_opts)
 	vim.cmd("term")
-	if compile.opts.hidden then
+	if opts.hidden then
 		vim.api.nvim_set_option_value("buflisted", false, { scope = "local", buf = compile.term.state.buf })
 	end
 	compile.term.state.channel = vim.api.nvim_get_option_value("channel", { buf = compile.term.state.buf })
 	vim.api.nvim_buf_set_name(compile.term.state.buf, opts.term_win_name)
+	require("compile.keymaps").attach(compile.term.state.buf)
 end
 
 --- Show terminal window

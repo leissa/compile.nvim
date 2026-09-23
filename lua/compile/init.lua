@@ -10,6 +10,10 @@ compile.opts = require("compile.opts")
 --- Clears the terminal and reinitializes it.
 --- This function effectively resets the compiler environment, removing any previous output and preparing it for a new compilation run.
 function compile.clear()
+	-- Nothing to clear; don't open an empty terminal
+	if not vim.api.nvim_buf_is_valid(compile.term.state.buf) then
+		return
+	end
 	compile.utils.enter_wrapper(function()
 		compile.term.destroy()
 		compile.term.init()
@@ -57,7 +61,12 @@ function compile.goto_error()
 	end
 
 	local win = compile.utils.get_normal_win()
-	vim.cmd("edit " .. c_error.file.val)
+	-- Only edit if the file isn't already shown: `:edit` on the current buffer reloads it,
+	-- which fails (or prompts with 'confirm') when it has unsaved changes.
+	local path = vim.fn.fnamemodify(c_error.file.val, ":p")
+	if vim.api.nvim_buf_get_name(vim.api.nvim_win_get_buf(win)) ~= path then
+		vim.cmd.edit(vim.fn.fnameescape(path))
+	end
 	vim.api.nvim_win_set_cursor(win, { c_error.row.val, c_error.col.val })
 	vim.api.nvim_win_set_cursor(compile.term.state.win, { c_error.file.pos[1][1] + 1, c_error.file.pos[1][2] })
 
